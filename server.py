@@ -27,17 +27,18 @@ class FileTransferServicer(file_transfer_pb2_grpc.FileTransferServiceServicer):
         total_bytes = 0
         chunks_received = 0
         start_time = time.time()
+        file_handle = None
         
         try:
-            with open(file_path, 'wb') if file_path else None as f:
-                for chunk in request_iterator:
-                    if filename is None:
-                        filename = chunk.filename
-                        file_path = self.upload_dir / filename
-                        logger.info(f"Iniciando recepción de archivo: {filename}")
-                        f = open(file_path, 'wb')
-                    
-                    f.write(chunk.data)
+            for chunk in request_iterator:
+                if filename is None:
+                    filename = chunk.filename
+                    file_path = self.upload_dir / filename
+                    logger.info(f"Iniciando recepción de archivo: {filename}")
+                    file_handle = open(file_path, 'wb')
+                
+                if file_handle:
+                    file_handle.write(chunk.data)
                     total_bytes += len(chunk.data)
                     chunks_received += 1
                     
@@ -46,16 +47,18 @@ class FileTransferServicer(file_transfer_pb2_grpc.FileTransferServiceServicer):
                     
                     if chunk.is_last_chunk:
                         break
-                        
-                if f:
-                    f.close()
+            
+            # Cerrar el archivo
+            if file_handle:
+                file_handle.close()
+                file_handle = None
             
             end_time = time.time()
             transfer_time = end_time - start_time
-            speed_mbps = (total_bytes / (1024*1024)) / transfer_time
+            speed_mbps = (total_bytes / (1024*1024)) / transfer_time if transfer_time > 0 else 0
             
             logger.info(f"Archivo {filename} recibido completamente:")
-            logger.info(f"  - Tamaño: {total_bytes / (1024*1024*1024):.2f} GB")
+            logger.info(f"  - Tamaño: {total_bytes / (1024*1024):.2f} MB")
             logger.info(f"  - Tiempo: {transfer_time:.2f} segundos")
             logger.info(f"  - Velocidad: {speed_mbps:.2f} MB/s")
             
@@ -67,6 +70,14 @@ class FileTransferServicer(file_transfer_pb2_grpc.FileTransferServiceServicer):
             
         except Exception as e:
             logger.error(f"Error durante la transferencia: {str(e)}")
+            
+            # Asegurar que el archivo se cierre en caso de error
+            if file_handle:
+                try:
+                    file_handle.close()
+                except:
+                    pass
+            
             return file_transfer_pb2.TransferResponse(
                 success=False,
                 message=f"Error: {str(e)}",
@@ -123,6 +134,7 @@ def serve(port=50051, max_workers=50):
     
     logger.info(f"Servidor iniciado en puerto {port}")
     logger.info(f"Máximo {max_workers} workers concurrentes")
+    logger.info(f"Directorio de subida: ./uploads")
     
     server.start()
     

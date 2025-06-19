@@ -57,7 +57,7 @@ class FileTransferClient:
                     
                 chunk_number += 1
                 bytes_sent += len(chunk_data)
-                is_last = chunk_number == total_chunks
+                is_last = chunk_number == total_chunks or len(chunk_data) < self.chunk_size
                 
                 yield file_transfer_pb2.FileChunk(
                     filename=filename,
@@ -69,7 +69,7 @@ class FileTransferClient:
                 
                 # Log progreso cada 100 chunks
                 if chunk_number % 100 == 0:
-                    progress = (bytes_sent / file_size) * 100
+                    progress = (bytes_sent / file_size) * 100 if file_size > 0 else 100
                     logger.info(f"Progreso: {progress:.1f}% ({bytes_sent / (1024*1024):.2f} MB enviados)")
                 
                 if is_last:
@@ -80,6 +80,11 @@ class FileTransferClient:
         start_time = time.time()
         
         try:
+            # Verificar que el archivo existe
+            if not os.path.exists(file_path):
+                logger.error(f"El archivo {file_path} no existe")
+                return False
+            
             with self._get_channel() as channel:
                 stub = file_transfer_pb2_grpc.FileTransferServiceStub(channel)
                 
@@ -92,9 +97,9 @@ class FileTransferClient:
                 transfer_time = end_time - start_time
                 
                 if response.success:
-                    speed_mbps = (response.bytes_received / (1024*1024)) / transfer_time
+                    speed_mbps = (response.bytes_received / (1024*1024)) / transfer_time if transfer_time > 0 else 0
                     logger.info(f"✅ Transferencia exitosa:")
-                    logger.info(f"   - Bytes enviados: {response.bytes_received / (1024*1024*1024):.2f} GB")
+                    logger.info(f"   - Bytes enviados: {response.bytes_received / (1024*1024):.2f} MB")
                     logger.info(f"   - Tiempo total: {transfer_time:.2f} segundos")
                     logger.info(f"   - Velocidad promedio: {speed_mbps:.2f} MB/s")
                     return True
