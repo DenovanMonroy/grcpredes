@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package filetransfer;
+
+service FileTransferService {
+    rpc TransferFile(stream FileChunk) returns (TransferResponse);
+    rpc GetFileInfo(FileInfoRequest) returns (FileInfoResponse);
+}
+
+message FileChunk {
+    string filename = 1;
+    bytes data = 2;
+    int64 chunk_number = 3;
+    int64 total_chunks = 4;
+    bool is_last_chunk = 5;
+}
+
+message TransferResponse {
+    bool success = 1;
+    string message = 2;
+    int64 bytes_received = 3;
+}
+
+message FileInfoRequest {
+    string filename = 1;
+}
+
+message FileInfoResponse {
+    bool exists = 1;
+    int64 file_size = 2;
+    string checksum = 3;
+}

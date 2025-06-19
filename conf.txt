@@ -1,0 +1,14 @@
+Configuración inicial:
+
+chmod +x setup.sh
+./setup.sh
+source grpc_env/bin/activate
+
+
+Ejecutar servidor:
+
+python server.py
+
+Ejecutar cliente individual:
+
+python client.py <IP_SERVIDOR> <RUTA_ARCHIVO>
